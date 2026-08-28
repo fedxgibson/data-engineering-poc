@@ -1,0 +1,57 @@
+version: 2
+
+models:
+  - name: dim_vessel
+    columns:
+      - name: mmsi
+        tests: [not_null, unique]
+
+  - name: dim_port
+    columns:
+      - name: port_id
+        tests: [not_null, unique]
+
+  - name: fct_port_calls
+    columns:
+      - name: port_id
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_port')
+                field: port_id
+      - name: mmsi
+        tests:
+          - relationships:
+              arguments:
+                to: ref('dim_vessel')
+                field: mmsi
+      - name: dwell_hours
+        tests:
+          # floor at 0 only -- no ceiling. domain/04-data-model.md documents why:
+          # a real call can last weeks (TZAREVNA case, Phase 0); a fixed ceiling
+          # would discard valid data instead of detecting a real geofencing bug.
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mmsi, arrival_ts]
+
+  - name: fct_port_congestion_daily
+    columns:
+      - name: date
+        tests: [not_null, unique]
+      - name: vessels_in_port
+        tests:
+          - dbt_utils.accepted_range:
+              arguments:
+                min_value: 0
+                inclusive: true
+
+  - name: fct_vessel_voyage_history
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [mmsi, seq_num]

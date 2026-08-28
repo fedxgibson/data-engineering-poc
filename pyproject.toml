@@ -1,0 +1,25 @@
+[project]
+name = "port-intelligence-agent"
+version = "0.1.0"
+description = "Port Intelligence Agent PoC — Maersk R193814"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.0",
+    "pandas>=2.2",
+    "matplotlib>=3.9",
+    "jupyter>=1.0",
+    "pyarrow>=17.0",
+    "anthropic>=0.75",
+    "pyyaml>=6.0",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "slowapi>=0.1.9",
+    "python-dotenv>=1.0",
+    "opentelemetry-api>=1.27",
+    "opentelemetry-sdk>=1.27",
+    "opentelemetry-instrumentation-fastapi>=0.48b0",
+    "opentelemetry-exporter-otlp-proto-http>=1.27",
+]
+
+[tool.setuptools]
+packages = []

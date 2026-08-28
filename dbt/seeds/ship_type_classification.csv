@@ -1,0 +1,18 @@
+ship_type,is_commercial
+Cargo,true
+Tanker,true
+Container,true
+Bulk carrier,true
+Tug,false
+Pilot,false
+Port tender,false
+HSC,false
+Passenger,false
+Pleasure,false
+SAR,false
+Dredging,false
+Fishing,false
+Law enforcement,false
+Military,false
+Other,false
+Reserved,false

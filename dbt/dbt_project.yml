@@ -1,0 +1,22 @@
+name: port_intelligence
+version: "1.0.0"
+config-version: 2
+
+profile: port_intelligence
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+clean-targets: ["target", "dbt_packages"]
+
+vars:
+  raw_ais_glob: "../data/interim/aarhus-*.parquet"
+
+models:
+  port_intelligence:
+    bronze:
+      +materialized: view
+    silver:
+      +materialized: table
+    gold:
+      +materialized: table
