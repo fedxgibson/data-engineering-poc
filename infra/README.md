@@ -100,7 +100,7 @@ docker push "$ACR_LOGIN_SERVER/port-intelligence-agent:latest"
 # used everywhere else in this repo (eval/run_eval.py, uvicorn locally):
 set -a && source .env && set +a
 cd infra/live/dev
-terragrunt run-all apply
+terragrunt run --all apply
 ```
 
 Note: `.env` never touches the repo or the container image, but Terraform
@@ -110,7 +110,7 @@ as the no-Key-Vault gap in [domain/06-security.md](../domain/06-security.md).
 Anyone with read access to the remote state storage account can read them in
 plaintext; that stops being acceptable the moment this is more than a PoC.
 
-`terragrunt run-all apply` resolves the dependency graph automatically
+`terragrunt run --all apply` resolves the dependency graph automatically
 (resource group → log analytics + container registry → container app
 environment → container app) via the `dependency` blocks in each component's
 `terragrunt.hcl` — no manual ordering needed beyond pushing the image before
