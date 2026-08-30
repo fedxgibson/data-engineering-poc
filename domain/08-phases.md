@@ -210,8 +210,22 @@ are different claims:
   by deleting the broken resource directly (`az containerapp delete`) and re-applying clean rather
   than fighting an import against a resource in a dead state.
 
-**Still open**: GitHub Actions (build + eval-gate + deploy) — the manual sequence above (documented
-in [infra/README.md](../infra/README.md)) works and is verified, but isn't automated yet.
+### CI/CD (implemented)
+
+[.github/workflows/ci.yml](../.github/workflows/ci.yml): `dbt seed && dbt run && dbt test`
+(Phase 1 gate) → build the injection eval fixture → run the 15-question eval set (Phase 2 gate,
+against real `claude-opus-5`) → build the Docker image. Runs on every push/PR to `main`; a change
+that breaks a golden answer fails the build, not just a local script.
+
+[.github/workflows/deploy.yml](../.github/workflows/deploy.yml): automates the exact manual apply
+sequence from [infra/README.md](../infra/README.md) after CI succeeds. Auth is OIDC federated
+credentials (`azure/login`), not a stored Azure secret — full setup in
+[infra/README.md](../infra/README.md#deploying-via-github-actions), including the least-privilege
+role assignments (scoped to the two resource groups this project touches, never the subscription).
+
+The `data/interim/*.parquet` fixture (14 days, ~38MB, already filtered to Aarhus in Phase 0) is
+committed on purpose so CI can rebuild the whole pipeline from scratch without needing the 590MB/day
+national raw files or live network access to the Danish Maritime Authority.
 
 ---
 

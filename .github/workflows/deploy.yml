@@ -1,0 +1,91 @@
+name: Deploy to Azure
+
+# Phase 5 (domain/08-phases.md): automates exactly the manual sequence
+# documented in infra/README.md. Runs after CI is green on main, or on
+# demand. Authenticates via OIDC federated credentials (azure/login) --
+# no long-lived Azure secret stored anywhere, just a short-lived token
+# per run (see the "Deploying via GitHub Actions" section of
+# infra/README.md for how the trust relationship was set up).
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch: {}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.13.4"
+          terraform_wrapper: false
+
+      - name: Install Terragrunt
+        run: |
+          curl -sL -o /usr/local/bin/terragrunt \
+            https://github.com/gruntwork-io/terragrunt/releases/download/v1.0.0/terragrunt_linux_amd64
+          chmod +x /usr/local/bin/terragrunt
+
+      # Order matters and can't be collapsed into `run --all apply`: the
+      # container app references an image that has to exist in the registry
+      # *before* it's created (see domain/08-phases.md's "orphaned resource"
+      # lesson -- Terraform doesn't pause mid-graph for a docker push).
+      - name: Apply resource group
+        working-directory: infra/live/dev/resource-group
+        run: terragrunt apply -auto-approve
+
+      - name: Apply container registry
+        working-directory: infra/live/dev/container-registry
+        run: terragrunt apply -auto-approve
+
+      - name: Build and push the API image
+        working-directory: infra/live/dev/container-registry
+        run: |
+          LOGIN_SERVER=$(terragrunt output -raw login_server)
+          ACR_NAME=$(terragrunt output -raw name)
+          az acr login --name "$ACR_NAME"
+          docker build \
+            -t "$LOGIN_SERVER/port-intelligence-agent:${{ github.sha }}" \
+            -t "$LOGIN_SERVER/port-intelligence-agent:latest" \
+            "$GITHUB_WORKSPACE"
+          docker push "$LOGIN_SERVER/port-intelligence-agent:${{ github.sha }}"
+          docker push "$LOGIN_SERVER/port-intelligence-agent:latest"
+
+      - name: Apply log analytics
+        working-directory: infra/live/dev/log-analytics
+        run: terragrunt apply -auto-approve
+
+      - name: Apply container app environment
+        working-directory: infra/live/dev/container-app-environment
+        run: terragrunt apply -auto-approve
+
+      - name: Apply container app
+        working-directory: infra/live/dev/container-app
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: terragrunt apply -auto-approve
+
+      - name: Print the live URL
+        working-directory: infra/live/dev/container-app
+        run: echo "Live at https://$(terragrunt output -raw fqdn)"

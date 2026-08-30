@@ -1,0 +1,57 @@
+name: CI
+
+# Phase 5 (domain/08-phases.md): build the pipeline, then run the Phase 2 eval
+# set as an actual merge gate -- not a manual check. A change to a tool, the
+# system prompt, or a dbt model that breaks a golden answer fails this build.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  DBT_PROFILES_DIR: ${{ github.workspace }}/dbt
+
+jobs:
+  build-test-eval:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          pip install --no-cache-dir .
+          pip install --no-cache-dir "dbt-core>=1.8" "dbt-duckdb>=1.8"
+
+      - name: dbt deps
+        working-directory: dbt
+        run: dbt deps
+
+      - name: Build bronze -> silver -> gold (Phase 1 gate)
+        working-directory: dbt
+        run: |
+          dbt seed
+          dbt run
+
+      - name: dbt test
+        working-directory: dbt
+        run: dbt test
+
+      - name: Build the prompt-injection eval fixture
+        run: python eval/build_eval_fixture.py
+
+      - name: Run the agent eval set (Phase 2 gate)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ANTHROPIC_WORKSPACE_ID: ${{ secrets.ANTHROPIC_WORKSPACE_ID }}
+        run: python eval/run_eval.py
+
+      - name: Build the API image (build check only, not pushed)
+        run: docker build -t port-intelligence-agent:ci .

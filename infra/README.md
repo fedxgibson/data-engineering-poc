@@ -116,6 +116,55 @@ environment → container app) via the `dependency` blocks in each component's
 `terragrunt.hcl` — no manual ordering needed beyond pushing the image before
 the container app first references it.
 
+## Deploying via GitHub Actions
+
+[.github/workflows/deploy.yml](../.github/workflows/deploy.yml) automates the exact manual sequence
+above (it can't use `run --all apply` for the same reason a human can't: the image has to exist in
+the registry before the container app references it). It runs after
+[ci.yml](../.github/workflows/ci.yml) succeeds on `main`, or on demand (`workflow_dispatch`).
+
+**Auth is OIDC, not a stored secret.** `azure/login` exchanges a GitHub-issued OIDC token for a
+short-lived Azure token every run — there's no client secret sitting in GitHub at all. Setting up
+that trust relationship, once, per subscription:
+
+```bash
+# 1. App registration + service principal
+APP_ID=$(az ad app create --display-name "gh-actions-portintel-poc" --query appId -o tsv)
+az ad sp create --id "$APP_ID"
+
+# 2. Federated credential: trust GitHub OIDC tokens, but only for this repo's main branch
+az ad app federated-credential create --id "$APP_ID" --parameters '{
+  "name": "github-main-branch",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:<owner>/<repo>:ref:refs/heads/main",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
+
+# 3. Least-privilege role assignments -- scoped to the two resource groups
+# this project actually touches, never the whole subscription.
+SUB_ID="<subscription-id>"
+az role assignment create --assignee "$APP_ID" --role Contributor \
+  --scope "/subscriptions/$SUB_ID/resourceGroups/rg-portintel-dev"
+az role assignment create --assignee "$APP_ID" --role Contributor \
+  --scope "/subscriptions/$SUB_ID/resourceGroups/rg-tfstate-portintel"
+
+# Contributor deliberately excludes managing role assignments -- but
+# modules/container-app creates one (the AcrPull grant for its own managed
+# identity). Grant that narrowly too, on the app's resource group only:
+az role assignment create --assignee "$APP_ID" --role "User Access Administrator" \
+  --scope "/subscriptions/$SUB_ID/resourceGroups/rg-portintel-dev"
+```
+
+Then set the GitHub secrets (`gh secret set NAME --body "$VALUE" --repo <owner>/<repo>`):
+`AZURE_CLIENT_ID` (the app's `appId`), `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, plus the same
+`ANTHROPIC_API_KEY` / `ANTHROPIC_WORKSPACE_ID` / `API_KEY` already used locally.
+
+`User Access Administrator` on a whole resource group is broader than the single role assignment
+Terraform actually creates — a fully least-privilege setup would use a custom role scoped to just
+`Microsoft.Authorization/roleAssignments/write` on the ACR. Documented here as a known trade-off
+rather than silently over-granting, same spirit as the no-Key-Vault gap in
+[domain/06-security.md](../domain/06-security.md).
+
 ## What's verified — applied to a real Azure subscription
 
 This has been deployed for real, not just planned. Live URL and the real problems hit along the way

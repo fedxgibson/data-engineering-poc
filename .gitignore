@@ -5,9 +5,14 @@ __pycache__/
 *.egg-info/
 
 data/raw/
-data/interim/
 data/processed/
 *.duckdb
+
+# data/interim/*.parquet IS committed on purpose: it's the already-filtered
+# (Aarhus-only, ~38MB) Phase 0 fixture that lets CI run `dbt run`/`dbt test`
+# and the eval set reproducibly, without needing the 590MB/day national raw
+# files or network access to the Danish Maritime Authority. See
+# .github/workflows/ci.yml and domain/08-phases.md, Phase 5.
 
 dbt/target/
 dbt/logs/
