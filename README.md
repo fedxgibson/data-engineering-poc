@@ -7,6 +7,10 @@ An agent that answers questions about port congestion and vessel call history fr
 (Danish Maritime Authority), over typed tools — no free text-to-SQL — with an eval set versioned in
 CI instead of a one-off demo.
 
+## Demo
+
+[![Demo video](https://drive.google.com/thumbnail?id=1nv3lztnTFbUVCh5_zLs1rKyIhSe4jRZf&sz=w1000)](https://drive.google.com/file/d/1nv3lztnTFbUVCh5_zLs1rKyIhSe4jRZf/view?usp=sharing)
+
 ## Problem
 
 The posting asks for agentic AI + data engineering + Python/Azure + enterprise integrations. This
@@ -80,6 +84,6 @@ didn't show it because its questions already come with an explicit date range.
 - **Phase 4** (OpenTelemetry observability) — complete: [agent/tracing.py](agent/tracing.py), a span per tool call + a span per request + an HTTP span, all nested under one trace_id — see real evidence in [domain/08-phases.md](domain/08-phases.md#real-evidence-implemented).
 - **Phase 5** (CI/CD + Azure) — complete: deployed for real to Azure Container Apps via Terraform/Terragrunt ([infra/](infra/), Gruntwork-style `modules/` + `live/`), live at `https://ca-portintel-dev.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io` — `/health`, `/sap/PortCallSet`, and `/query` all verified responding from Azure, not localhost. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the eval set as a real merge gate; deploy ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) authenticates to Azure via OIDC, no stored secret. Real deployment problems hit and fixed are in [domain/08-phases.md](domain/08-phases.md#real-evidence-applied-to-a-real-azure-subscription).
 - **Frontend** (chat UI) — React + react-router + shadcn/ui ([frontend/](frontend/)), live at `https://ca-portintel-dev-web.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io`, talking to `/query` and rendering the tool-call audit trail per answer, plus a sidebar of suggested questions. Deployed as a second Container App reusing the same Terraform module as the backend ([infra/live/dev/frontend-app](infra/live/dev/frontend-app)).
-- **Phase 6** (wrap-up: README + security review) — complete. A short demo video is optional, recorded later if time allows.
+- **Phase 6** (wrap-up: README + security review + demo video) — complete.
 
 Detail on each phase in [domain/08-phases.md](domain/08-phases.md).
