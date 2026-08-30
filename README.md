@@ -17,7 +17,7 @@ Maersk. Full detail in [domain/01-problem.md](domain/01-problem.md).
 
 Ingestion (Event Hubs) → bronze/silver/gold lake (Blob + Parquet + dbt) → semantic layer
 (DuckDB/Postgres) → agent with typed tools → FastAPI + mock SAP OData, all traced with
-OpenTelemetry.
+OpenTelemetry, with a React chat UI ([frontend/](frontend/)) in front of it.
 
 Full diagrams (architecture, layer model, query sequence, deployment) in
 [domain/02-architecture.md](domain/02-architecture.md).
@@ -82,7 +82,8 @@ didn't show it because its questions already come with an explicit date range.
 - **Phase 2** (agent + eval set) — complete: [agent/](agent/), [eval/](eval/), 13/15 PASS + 2 correct manual.
 - **Phase 3** (FastAPI backend + mock SAP OData) — complete: [api/](api/), API-key auth, rate limiting (30/min) verified, `/query` and `/sap/PortCallSet` tested with real data.
 - **Phase 4** (OpenTelemetry observability) — complete: [agent/tracing.py](agent/tracing.py), a span per tool call + a span per request + an HTTP span, all nested under one trace_id — see real evidence in [domain/08-phases.md](domain/08-phases.md#real-evidence-implemented).
-- **Phase 5** (CI/CD + Azure) — complete: deployed for real to Azure Container Apps via Terraform/Terragrunt ([infra/](infra/), Gruntwork-style `modules/` + `live/`), live at `https://ca-portintel-dev--96is9kz.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io` — `/health`, `/sap/PortCallSet`, and `/query` all verified responding from Azure, not localhost. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the eval set as a real merge gate; deploy ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) authenticates to Azure via OIDC, no stored secret. Real deployment problems hit and fixed are in [domain/08-phases.md](domain/08-phases.md#real-evidence-applied-to-a-real-azure-subscription).
+- **Phase 5** (CI/CD + Azure) — complete: deployed for real to Azure Container Apps via Terraform/Terragrunt ([infra/](infra/), Gruntwork-style `modules/` + `live/`), live at `https://ca-portintel-dev.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io` — `/health`, `/sap/PortCallSet`, and `/query` all verified responding from Azure, not localhost. CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs the eval set as a real merge gate; deploy ([.github/workflows/deploy.yml](.github/workflows/deploy.yml)) authenticates to Azure via OIDC, no stored secret. Real deployment problems hit and fixed are in [domain/08-phases.md](domain/08-phases.md#real-evidence-applied-to-a-real-azure-subscription).
+- **Frontend** (chat UI) — React + react-router + shadcn/ui ([frontend/](frontend/)), live at `https://ca-portintel-dev-web.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io`, talking to `/query` and rendering the tool-call audit trail per answer, plus a sidebar of suggested questions. Deployed as a second Container App reusing the same Terraform module as the backend ([infra/live/dev/frontend-app](infra/live/dev/frontend-app)).
 - **Phase 6** (wrap-up: README + Loom) — pending.
 
 Detail on each phase in [domain/08-phases.md](domain/08-phases.md).

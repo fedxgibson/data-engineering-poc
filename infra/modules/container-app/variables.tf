@@ -18,6 +18,16 @@ variable "container_app_environment_id" {
   description = "ID of the Container Apps Environment to run in."
 }
 
+variable "environment_default_domain" {
+  type        = string
+  description = <<-EOT
+    The Container Apps Environment's default_domain output (see
+    modules/container-app-environment). Used to build this app's *stable*
+    fqdn output -- see outputs.tf for why `latest_revision_fqdn` alone isn't
+    enough.
+  EOT
+}
+
 variable "container_registry_id" {
   type        = string
   description = "ID of the Azure Container Registry, used to scope the AcrPull role assignment."
@@ -31,6 +41,12 @@ variable "container_registry_login_server" {
 variable "image_name" {
   type        = string
   description = "Image repository name inside the registry, e.g. port-intelligence-agent."
+}
+
+variable "container_name" {
+  type        = string
+  description = "Name of the container inside the revision template -- purely internal to the Container App, but kept accurate (e.g. \"web\" for the frontend) rather than always \"api\"."
+  default     = "api"
 }
 
 variable "image_tag" {

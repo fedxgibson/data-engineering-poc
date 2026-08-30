@@ -62,7 +62,7 @@ resource "azurerm_container_app" "this" {
     max_replicas = var.max_replicas
 
     container {
-      name   = "api"
+      name   = var.container_name
       image  = "${var.container_registry_login_server}/${var.image_name}:${var.image_tag}"
       cpu    = var.cpu
       memory = var.memory

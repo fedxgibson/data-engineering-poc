@@ -41,33 +41,39 @@ dependency "container_registry" {
   mock_outputs_allowed_terraform_commands = ["validate", "plan"]
 }
 
+# The frontend's API_URL env var is wired straight from the backend's own
+# Terragrunt output -- no manual copy-pasting a URL between components, and
+# no coupling to the frontend Docker build (see src/lib/config.ts /
+# docker-entrypoint.sh: the value is injected at container *start*, not
+# baked in at build time).
+dependency "container_app" {
+  config_path = "../container-app"
+
+  mock_outputs = {
+    fqdn = "mock-backend.example.com"
+  }
+  mock_outputs_allowed_terraform_commands = ["validate", "plan"]
+}
+
 inputs = {
-  name                             = "ca-${include.env.locals.name_prefix}"
+  name                             = "ca-${include.env.locals.name_prefix}-web"
   location                         = dependency.resource_group.outputs.location
   resource_group_name              = dependency.resource_group.outputs.name
   container_app_environment_id     = dependency.container_app_environment.outputs.id
   environment_default_domain       = dependency.container_app_environment.outputs.default_domain
   container_registry_id            = dependency.container_registry.outputs.id
   container_registry_login_server  = dependency.container_registry.outputs.login_server
-  image_name                       = include.env.locals.image_name
-  image_tag                        = include.env.locals.image_tag
+  image_name                       = include.env.locals.frontend_image_name
+  image_tag                        = include.env.locals.frontend_image_tag
+  container_name                   = "web"
   cpu                              = include.env.locals.container_cpu
   memory                           = include.env.locals.container_memory
   min_replicas                     = include.env.locals.container_min_replicas
   max_replicas                     = include.env.locals.container_max_replicas
-  target_port                      = 8000
+  target_port                      = 8080
   tags                             = include.env.locals.tags
 
   env_vars = {
-    AGENT_MODEL = "claude-opus-5"
-  }
-
-  # Read from the operator's shell environment, never committed --
-  # domain/06-security.md. Same variable names the app already uses locally
-  # (.env.example): ANTHROPIC_API_KEY, ANTHROPIC_WORKSPACE_ID, API_KEY.
-  secrets = {
-    ANTHROPIC_API_KEY      = get_env("ANTHROPIC_API_KEY", "")
-    ANTHROPIC_WORKSPACE_ID = get_env("ANTHROPIC_WORKSPACE_ID", "")
-    API_KEY                = get_env("API_KEY", "")
+    API_URL = "https://${dependency.container_app.outputs.fqdn}"
   }
 }

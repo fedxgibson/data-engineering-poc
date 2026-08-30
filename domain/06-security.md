@@ -54,6 +54,11 @@ different clients or business units, cross-tenant data leakage can't depend on t
 - Rate limiting per API key ([03-tech-stack.md](03-tech-stack.md)) — prevents a single client from
   exhausting the LLM budget.
 - The mock SAP OData endpoint exposes no writes — it's read-only, just like the tools.
+- CORS (`api/main.py`) defaults to `allow_origins=["*"]`, controlled by `CORS_ORIGINS`. This is
+  deliberately permissive for a PoC where every route still requires `X-API-Key` — CORS controls
+  which *browser origins* may read a response, not who can call the API, so it doesn't weaken the
+  auth boundary above. Worth tightening to the frontend's exact origin the moment this stops being a
+  demo, same spirit as the other "acceptable now, not forever" gaps below.
 
 ### 5. CI/CD and cloud deployment surface (Phase 5)
 

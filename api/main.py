@@ -11,6 +11,7 @@ from typing import Any
 import duckdb
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -54,6 +55,17 @@ app = FastAPI(
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS_ORIGINS defaults to "*" (fine for a PoC that also requires an API key
+# on every route, domain/06-security.md) -- set it to the frontend's real
+# origin(s), comma-separated, once that's known.
+_cors_origins = os.environ.get("CORS_ORIGINS", "*")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"] if _cors_origins == "*" else _cors_origins.split(","),
+    allow_methods=["GET", "POST"],
+    allow_headers=["X-API-Key", "Content-Type"],
+)
 
 # Phase 4 (domain/08-phases.md): one span per HTTP request, parent of "agent.run"
 # and of the "tool.*" spans emitted by agent/tools.py -- the context propagates

@@ -1,0 +1,11 @@
+*
+!index.html
+!package.json
+!package-lock.json
+!vite.config.ts
+!tsconfig*.json
+!components.json
+!nginx.conf
+!docker-entrypoint.sh
+!src/
+!public/

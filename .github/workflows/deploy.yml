@@ -104,6 +104,29 @@ jobs:
           API_KEY: ${{ secrets.API_KEY }}
         run: terragrunt apply -auto-approve
 
-      - name: Print the live URL
-        working-directory: infra/live/dev/container-app
-        run: echo "Live at https://$(terragrunt output -raw fqdn)"
+      # Frontend goes last: its terragrunt.hcl depends on the backend
+      # container app's fqdn output (infra/live/dev/frontend-app), so the
+      # backend has to exist first -- same ordering constraint as the
+      # registry-before-container-app rule above, one hop further down
+      # the graph.
+      - name: Build and push the frontend image
+        working-directory: infra/live/dev/container-registry
+        run: |
+          LOGIN_SERVER=$(terragrunt output -raw login_server)
+          ACR_NAME=$(terragrunt output -raw name)
+          az acr login --name "$ACR_NAME"
+          docker build \
+            -t "$LOGIN_SERVER/port-intelligence-frontend:${{ github.sha }}" \
+            -t "$LOGIN_SERVER/port-intelligence-frontend:latest" \
+            "$GITHUB_WORKSPACE/frontend"
+          docker push "$LOGIN_SERVER/port-intelligence-frontend:${{ github.sha }}"
+          docker push "$LOGIN_SERVER/port-intelligence-frontend:latest"
+
+      - name: Apply frontend container app
+        working-directory: infra/live/dev/frontend-app
+        run: terragrunt apply -auto-approve
+
+      - name: Print the live URLs
+        run: |
+          echo "API at   https://$(cd infra/live/dev/container-app && terragrunt output -raw fqdn)"
+          echo "Chat at  https://$(cd infra/live/dev/frontend-app && terragrunt output -raw fqdn)"

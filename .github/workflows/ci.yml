@@ -55,3 +55,6 @@ jobs:
 
       - name: Build the API image (build check only, not pushed)
         run: docker build -t port-intelligence-agent:ci .
+
+      - name: Build the frontend image (build check only, not pushed)
+        run: docker build -t port-intelligence-frontend:ci ./frontend

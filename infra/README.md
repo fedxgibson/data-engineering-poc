@@ -17,7 +17,7 @@ infra/
 │   ├── log-analytics/
 │   ├── container-registry/
 │   ├── container-app-environment/
-│   └── container-app/
+│   └── container-app/       # generic enough to deploy BOTH the API and the frontend
 └── live/
     ├── root.hcl            # remote state backend + provider, inherited by everything below
     └── dev/
@@ -26,8 +26,20 @@ infra/
         ├── log-analytics/terragrunt.hcl
         ├── container-registry/terragrunt.hcl
         ├── container-app-environment/terragrunt.hcl
-        └── container-app/terragrunt.hcl
+        ├── container-app/terragrunt.hcl        # backend (../api)
+        └── frontend-app/terragrunt.hcl         # chat UI (../frontend)
 ```
+
+`frontend-app` reuses the exact same `modules//container-app` as the backend --
+only the inputs differ (image name, `container_name = "web"`, `target_port = 8080`
+for nginx). Its `env_vars.API_URL` is wired straight from `container-app`'s own
+`fqdn` output via a Terragrunt `dependency` block -- no URL is ever
+copy-pasted between components, and the frontend Docker image never needs to
+know the backend's address at build time (see
+[../frontend/src/lib/config.ts](../frontend/src/lib/config.ts) and
+[../frontend/docker-entrypoint.sh](../frontend/docker-entrypoint.sh): the
+value is injected into `config.js` when the container *starts*, by nginx's
+own `/docker-entrypoint.d/` mechanism).
 
 Adding a `staging` or `prod` environment later means copying `live/dev/` to
 `live/staging/`, editing `env.hcl`, and nothing else — no module changes, no
@@ -36,8 +48,8 @@ duplicated Terraform.
 ## What's actually deployed (and what isn't)
 
 Matches the minimal scope cut ([domain/07-scope-cutlines.md](../domain/07-scope-cutlines.md)):
-one Container App running the FastAPI image, with its own Container Apps
-Environment, an Azure Container Registry to host the image, and a Log
+two Container Apps (the FastAPI backend and the React chat UI) sharing one
+Container Apps Environment, one Azure Container Registry, and one Log
 Analytics workspace for platform logs. No Event Hubs (batch ingestion, not
 streaming), no Blob Storage (the DuckDB warehouse is baked into the Docker
 image at build time — see [../Dockerfile](../Dockerfile)), no Key Vault
@@ -112,9 +124,17 @@ plaintext; that stops being acceptable the moment this is more than a PoC.
 
 `terragrunt run --all apply` resolves the dependency graph automatically
 (resource group → log analytics + container registry → container app
-environment → container app) via the `dependency` blocks in each component's
-`terragrunt.hcl` — no manual ordering needed beyond pushing the image before
-the container app first references it.
+environment → container app → frontend-app) via the `dependency` blocks in
+each component's `terragrunt.hcl` — no manual ordering needed beyond pushing
+both images before the container app that references each one first runs.
+Build and push the frontend image the same way as step 2, just against
+`../../../../frontend` instead of the repo root:
+
+```bash
+cd infra/live/dev/frontend-app
+docker build -t "$ACR_LOGIN_SERVER/port-intelligence-frontend:latest" ../../../../frontend
+docker push "$ACR_LOGIN_SERVER/port-intelligence-frontend:latest"
+```
 
 ## Deploying via GitHub Actions
 
@@ -183,7 +203,8 @@ rather than silently over-granting, same spirit as the no-Key-Vault gap in
 
 This has been deployed for real, not just planned. Live URL and the real problems hit along the way
 (region restrictions, an unregistered resource provider, an arm64/amd64 image mismatch, an orphaned
-resource after a failed apply) are in [domain/08-phases.md](../domain/08-phases.md#real-evidence-applied-to-a-real-azure-subscription) —
+resource after a failed apply, and a stale-revision-hostname bug in this module's original `fqdn`
+output) are in [domain/08-phases.md](../domain/08-phases.md#real-evidence-applied-to-a-real-azure-subscription) —
 worth reading before assuming `terraform validate` passing means a real subscription will cooperate.
 
 - Every module validates standalone (`terraform validate`) and applies cleanly end to end via
@@ -194,6 +215,10 @@ worth reading before assuming `terraform validate` passing means a real subscrip
   an arm64-only manifest that Azure Container Apps rejects).
 - `/health`, the authenticated `/sap/PortCallSet`, and `/query` (the real agent, calling the real
   Claude API) all responded `200` from the live Azure URL.
+- The frontend Container App serves the chat UI and talks to the backend Container App over the
+  public internet (both are `external_enabled = true` Container Apps, domain/06-security.md #4) —
+  not over a private VNet. Acceptable for a PoC that's meant to be reachable with just a browser and
+  an API key; a production version would put both behind a VNet-integrated environment.
 
 ## Known gaps
 
@@ -208,3 +233,10 @@ worth reading before assuming `terraform validate` passing means a real subscrip
 - **No autoscaling beyond `min/max_replicas`.** `container_min_replicas = 0`
   means the app scales to zero when idle (cheapest for a demo) at the cost of
   a cold start on the next request.
+- **A `:latest` image push doesn't force a new revision.** Both `deploy.yml` and the manual sequence
+  above push to a mutable `:latest` tag; if nothing else in a `terragrunt.hcl` changed, `terraform
+  apply` sees no diff and never asks Azure to roll a new revision, so the old code keeps running
+  despite the new image sitting in ACR. Hit for real and worked around manually
+  ([domain/08-phases.md](../domain/08-phases.md#real-evidence-applied-to-a-real-azure-subscription));
+  not yet fixed in the pipeline itself. A digest- or commit-sha-based `revision_suffix` in each
+  `container-app*/terragrunt.hcl` would close this properly.

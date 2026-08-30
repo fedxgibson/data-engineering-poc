@@ -183,9 +183,20 @@ away, no module changes) — full detail in [infra/README.md](../infra/README.md
 real, end to end: resource group → storage/log analytics/registry → container app environment →
 container app, all created in a real Azure subscription (`swedencentral`).
 
-**The API is live**: `https://ca-portintel-dev--96is9kz.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io`
+**The API is live**: `https://ca-portintel-dev.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io`
 — `/health`, the authenticated `/sap/PortCallSet`, and `/query` (the real agent, calling the real
 Claude API) all verified responding `200` from that URL, not from a local machine.
+
+**Frontend added after the initial deploy**: a React + react-router + shadcn/ui chat UI
+([frontend/](../frontend/)) calling `/query` and rendering the tool-call audit trail per answer.
+Deployed as a second Container App reusing the exact same `modules//container-app` Terraform module
+as the backend — only the inputs differ (`container_name = "web"`, `target_port = 8080` for nginx,
+`image_name = "port-intelligence-frontend"`). Its `API_URL` env var is wired from the backend
+container app's own `fqdn` output via a Terragrunt `dependency` block
+([infra/live/dev/frontend-app](../infra/live/dev/frontend-app)) rather than hardcoded, and injected
+into the running container at start time by nginx's `/docker-entrypoint.d/` mechanism
+([frontend/docker-entrypoint.sh](../frontend/docker-entrypoint.sh)) — one built image works
+unmodified across environments.
 
 ### Real problems hit during the actual apply (and why they're worth keeping)
 
@@ -203,6 +214,30 @@ are different claims:
   `docker build`, producing an arm64-only manifest. Azure Container Apps rejected it at revision
   provisioning time (`no child with platform linux/amd64 in index ...`). Fixed with
   `docker buildx build --platform linux/amd64 ... --push`.
+- **`latest_revision_fqdn` is not a stable URL**: after adding the frontend, a manual
+  `az containerapp update --revision-suffix ...` (used to force the backend to re-pull a
+  `:latest`-tagged image after a code change with no Terraform-visible diff, see below) replaced the
+  backend's active revision — and the *previously recorded* live URL, which was
+  `azurerm_container_app.this.latest_revision_fqdn`, started 404ing with "This Container App is
+  stopped or does not exist." That attribute is the **per-revision** hostname
+  (`app--<revision-suffix>.env-domain`); in `revision_mode = "Single"`, the old revision (and its
+  hostname) is torn down the moment a new one takes over. The actually-stable address is
+  `<app-name>.<environment-default-domain>` — no revision suffix — which doesn't change no matter how
+  many times the app is redeployed. Fixed in `modules/container-app/outputs.tf` (the `fqdn` output
+  now builds this stable form from a new `environment_default_domain` input, sourced from
+  `modules/container-app-environment`'s new `default_domain` output) and re-applied to both apps.
+  Every URL in this repo now points at the stable form.
+- **A `:latest` tag push doesn't trigger a new revision by itself**: pushing an updated image to ACR
+  under the same tag, then running `terragrunt apply`, is a no-op if nothing else in the Terraform
+  config changed — Terraform diffs the *string* `"...:latest"`, not the image digest behind it, so it
+  sees no drift and never asks Azure to create a new revision. This is why the backend had to be
+  force-updated manually (`az containerapp update --image ...:latest --revision-suffix <unique>`)
+  after adding CORS support, even though the new image was already sitting in the registry. The
+  existing CI/CD pipeline ([.github/workflows/deploy.yml](../.github/workflows/deploy.yml)) has this
+  exact latent gap: a push-triggered deploy that changes only application code (no Terraform input
+  changes) would build and push a new image and then silently leave the old revision running. Not yet
+  fixed — worth a `revision_suffix = plantimestamp()` or content-hash-based suffix in
+  `live/*/container-app*/terragrunt.hcl` if this goes further than a PoC.
 - **Orphaned resource after a failed apply**: the container app with the bad image was actually
   created in Azure before Terraform's polling step failed waiting for it to become healthy — so the
   resource existed in Azure but not in Terraform state. `terraform import` couldn't recover it either

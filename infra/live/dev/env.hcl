@@ -33,4 +33,7 @@ locals {
 
   image_name = "port-intelligence-agent"
   image_tag  = "latest"
+
+  frontend_image_name = "port-intelligence-frontend"
+  frontend_image_tag  = "latest"
 }
