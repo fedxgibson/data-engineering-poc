@@ -18,6 +18,9 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  DBT_PROFILES_DIR: ${{ github.workspace }}/dbt
+
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
@@ -25,6 +28,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # deploy.yml runs in its own runner, with its own empty filesystem --
+      # data/warehouse.duckdb from ci.yml's job doesn't carry over across
+      # workflows. Rebuilding it here keeps this workflow self-contained
+      # (it works standalone via workflow_dispatch too, not just chained
+      # after CI) rather than reaching for an artifact download.
+      - name: Build the DuckDB warehouse the image bakes in
+        run: |
+          pip install --no-cache-dir "dbt-core>=1.8" "dbt-duckdb>=1.8"
+          cd dbt && dbt deps && dbt seed && dbt run
 
       - name: Azure login (OIDC)
         uses: azure/login@v2
