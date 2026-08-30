@@ -35,8 +35,9 @@ demonstrating the competency the posting asks for and demonstrating something el
 In this order, from first to cut to last:
 
 1. `compare_ports` (4th tool) — nice, not essential; the 3 base tools already sustain the eval set.
-2. Real streaming via Event Hubs → historical batch. The bronze/silver/gold pipeline is the same,
-   only the entry point changes.
+2. Real streaming via Event Hubs → historical batch. Bronze's schema and the agent's tool interface
+   stay the same; silver's windowing logic and the gold layer's storage engine don't — see
+   [02-architecture.md](02-architecture.md#batch--streaming-migration-path) for what actually changes.
 3. Multiple ports → a single port. The geofencing and aggregation logic doesn't change, only the
    data volume.
 4. Azure Key Vault → environment variables, explicitly documented in
