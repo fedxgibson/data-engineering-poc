@@ -1,0 +1,7 @@
+# Deny-by-default, allow-list what the image actually needs -- same
+# least-privilege instinct as the rest of this project (domain/06-security.md).
+*
+!agent/
+!api/
+!requirements-api.txt
+!data/warehouse.duckdb

@@ -171,6 +171,27 @@ purpose once, don't assume the gate works.
 
 **Depends on**: Phases 3 and 4 (what gets dockerized and deployed is already complete and traced).
 
+### Progress (implemented, not yet applied to a real subscription)
+
+Dockerization is done: [Dockerfile](../Dockerfile) builds a slim, non-root image with the DuckDB
+warehouse baked in at build time (consistent with the "batch, already-processed data" cut,
+[07-scope-cutlines.md](07-scope-cutlines.md)) — verified with a real `docker build` + `docker run`,
+`/health` and the authenticated `/sap/PortCallSet` both responding correctly.
+
+The Azure IaC is written as Terraform modules + Terragrunt environments (Gruntwork-style
+`modules/` + `live/` split, one `dev` environment structured so `staging`/`prod` are a copy-and-edit
+away, no module changes) — full detail in [infra/README.md](../infra/README.md). Every module
+validates standalone (`terraform validate`), and the Terragrunt wiring (remote state, provider
+generation, `dependency` blocks between resource group → log analytics/registry → environment →
+container app) resolves correctly up to the point of needing real Azure credentials, which this PoC
+was built without (`az` CLI not installed, no subscription connected in this environment) — that's
+the honest, verified boundary, not a config error.
+
+**Still open**: GitHub Actions (build + eval-gate + deploy) and an actual `terragrunt apply` against
+a real subscription, which needs the one-time state-backend bootstrap
+([infra/bootstrap](../infra/bootstrap)) and real credentials neither of which existed while building
+this PoC.
+
 ---
 
 ## Phase 6 — Wrap-up: README, security, and video

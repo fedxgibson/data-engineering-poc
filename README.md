@@ -82,7 +82,7 @@ didn't show it because its questions already come with an explicit date range.
 - **Phase 2** (agent + eval set) — complete: [agent/](agent/), [eval/](eval/), 13/15 PASS + 2 correct manual.
 - **Phase 3** (FastAPI backend + mock SAP OData) — complete: [api/](api/), API-key auth, rate limiting (30/min) verified, `/query` and `/sap/PortCallSet` tested with real data.
 - **Phase 4** (OpenTelemetry observability) — complete: [agent/tracing.py](agent/tracing.py), a span per tool call + a span per request + an HTTP span, all nested under one trace_id — see real evidence in [domain/08-phases.md](domain/08-phases.md#real-evidence-implemented).
-- **Phase 5** (CI/CD + Azure) — pending.
+- **Phase 5** (CI/CD + Azure) — in progress: [Dockerfile](Dockerfile) built and verified, Terraform/Terragrunt IaC written and validated in [infra/](infra/) (Gruntwork-style `modules/` + `live/`, one `dev` environment) — blocked only on real Azure credentials to actually apply. GitHub Actions still open.
 - **Phase 6** (wrap-up: README + Loom) — pending.
 
 Detail on each phase in [domain/08-phases.md](domain/08-phases.md).

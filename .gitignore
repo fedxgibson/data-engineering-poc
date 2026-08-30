@@ -17,3 +17,11 @@ dbt/.user.yml
 logs/
 
 .env
+
+# Terraform / Terragrunt generated artifacts -- never source, always regenerable.
+**/.terraform/
+**/.terragrunt-cache/
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.lock.hcl
