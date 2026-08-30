@@ -55,13 +55,42 @@ different clients or business units, cross-tenant data leakage can't depend on t
   exhausting the LLM budget.
 - The mock SAP OData endpoint exposes no writes — it's read-only, just like the tools.
 
+### 5. CI/CD and cloud deployment surface (Phase 5)
+
+Deploying for real to Azure ([08-phases.md](08-phases.md), [infra/README.md](../infra/README.md))
+added a second surface this threat model didn't originally cover: the pipeline that ships the
+agent, not just the agent itself.
+
+**What's implemented well**:
+- The Azure Container Registry has `admin_enabled = false` — the running container authenticates
+  with its own user-assigned managed identity, scoped to `AcrPull` on that one registry, never a
+  shared username/password.
+- The GitHub Actions deploy uses OIDC federated credentials (`azure/login`) — every run exchanges a
+  short-lived token; there's no long-lived Azure secret sitting in GitHub at all.
+
+**What's a real, known gap, same spirit as the Key Vault gap below**:
+- The OIDC service principal holds `Contributor` **and** `User Access Administrator` on
+  `rg-portintel-dev` — broader than it needs. The only reason it needs any access-management
+  permission at all is one `AcrPull` role assignment Terraform creates for the container app's
+  identity; a custom role scoped to just `Microsoft.Authorization/roleAssignments/write` on the
+  registry would be the correct least-privilege version. Documented, not silently over-granted.
+- `ANTHROPIC_API_KEY` / `API_KEY` / `ANTHROPIC_WORKSPACE_ID` end up in Terraform's remote state in
+  plaintext once applied (Terraform needs the value to detect drift). Anyone with read access to the
+  state storage account can read them — functionally the same exposure as not using Key Vault, just
+  a different place it shows up.
+- The repo (and the live Container App URL) is public. That's the intended deliverable — "runs on
+  Azure, verifiable with a URL" — not an oversight, and it's mitigated by the same API-key auth and
+  rate limiting as any other client hitting the API. Worth naming explicitly rather than assuming
+  "public repo" only affects code, not the running infrastructure it describes.
+
 ## What's out of scope for the PoC (and why that's fine)
 
 - There's no WAF or dedicated injection scanner — the real control is "the tools don't run free
   SQL", which is a structural mitigation, not a patch.
 - There's no enterprise secrets management (Key Vault is mentioned as *if time allows* in
-  [07-scope-cutlines.md](07-scope-cutlines.md)) — for the PoC, environment variables are acceptable,
-  and the gap is documented explicitly instead of pretending it's solved.
+  [07-scope-cutlines.md](07-scope-cutlines.md)) — for the PoC, environment variables and Container
+  Apps' own secret store are acceptable, and the gap (including where it resurfaces in Terraform
+  state, above) is documented explicitly instead of pretending it's solved.
 
 ## Why this matters for the interview
 
