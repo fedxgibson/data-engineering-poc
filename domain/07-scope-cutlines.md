@@ -46,7 +46,6 @@ In this order, from first to cut to last:
 
 - Repo with a one-page README: problem → architecture → eval results → cost per query
   (see the template in the [root README](../README.md)).
-- A 3-minute Loom showing the real flow (not just slides).
 - The link goes in the cover letter, not attached as a file.
 
 See [08-phases.md](08-phases.md) for the concrete implementation order and at which point in each

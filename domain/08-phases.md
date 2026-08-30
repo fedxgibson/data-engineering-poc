@@ -279,7 +279,7 @@ discoverable by actually running it — see
 
 ---
 
-## Phase 6 — Wrap-up: README, security, and video
+## Phase 6 — Wrap-up: README and security
 
 **Objective**: the repo is self-contained for anyone reading it from the cover-letter link.
 
@@ -287,12 +287,14 @@ discoverable by actually running it — see
   real numbers from Phases 2 and 4.
 - Review [06-security.md](06-security.md) against what was actually implemented — if something was
   cut (e.g., Key Vault), document it as a known gap instead of leaving it out.
-- Record the 3-minute Loom: problem → live demo → eval results → one sentence on the security angle.
 
-**Deliverable**: finished repo + Loom link, ready to paste into the cover letter.
+A short demo video is a nice-to-have on top of this, not a planned deliverable — recorded later if
+time allows.
 
-**Done when**: someone who's never seen the project before can, in 3 minutes of video plus 5 minutes
-of README, understand what was built, why, and how well it works — with evidence, not adjectives.
+**Deliverable**: finished repo, ready to paste into the cover letter.
+
+**Done when**: someone who's never seen the project before can, in 5 minutes of README, understand
+what was built, why, and how well it works — with evidence, not adjectives.
 
 **Depends on**: all of the above.
 
@@ -307,7 +309,7 @@ flowchart LR
     F2 --> F3["Phase 3\nBackend and API"]
     F3 --> F4["Phase 4\nObservability"]
     F4 --> F5["Phase 5\nCI/CD and Azure"]
-    F5 --> F6["Phase 6\nWrap-up: README + video"]
+    F5 --> F6["Phase 6\nWrap-up: README"]
 ```
 
 No phase is parallelizable with the next because each one consumes the previous one's deliverable as
