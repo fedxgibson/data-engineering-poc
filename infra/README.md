@@ -94,11 +94,21 @@ docker build -t "$ACR_LOGIN_SERVER/port-intelligence-agent:latest" ../../../../.
 az acr login --name "$(terragrunt output -raw name)"
 docker push "$ACR_LOGIN_SERVER/port-intelligence-agent:latest"
 
-# 3. bring up the rest of the stack, secrets from your shell env
-export ANTHROPIC_API_KEY=...      # or ANTHROPIC_WORKSPACE_ID / API_KEY as needed
+# 3. bring up the rest of the stack
+# Terragrunt's get_env() (live/dev/container-app/terragrunt.hcl) reads process
+# env vars, not .env files -- load .env into the shell first, same pattern
+# used everywhere else in this repo (eval/run_eval.py, uvicorn locally):
+set -a && source .env && set +a
 cd infra/live/dev
 terragrunt run-all apply
 ```
+
+Note: `.env` never touches the repo or the container image, but Terraform
+*does* record the secret values in its state file once applied (it needs them
+to detect drift) -- for this PoC that's an accepted trade-off, same reasoning
+as the no-Key-Vault gap in [domain/06-security.md](../domain/06-security.md).
+Anyone with read access to the remote state storage account can read them in
+plaintext; that stops being acceptable the moment this is more than a PoC.
 
 `terragrunt run-all apply` resolves the dependency graph automatically
 (resource group → log analytics + container registry → container app
