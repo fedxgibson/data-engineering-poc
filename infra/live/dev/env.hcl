@@ -6,7 +6,9 @@
 
 locals {
   environment = "dev"
-  location    = "westeurope"
+  # westeurope rejected new resources on this subscription ("not accepting
+  # new customers") -- swedencentral is the working Nordic region instead.
+  location    = "swedencentral"
 
   # Short, deterministic suffix instead of a `random_string` resource: Azure
   # Container Registry and Storage Account names must be globally unique, and

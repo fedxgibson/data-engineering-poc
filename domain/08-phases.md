@@ -171,26 +171,47 @@ purpose once, don't assume the gate works.
 
 **Depends on**: Phases 3 and 4 (what gets dockerized and deployed is already complete and traced).
 
-### Progress (implemented, not yet applied to a real subscription)
+### Real evidence (applied to a real Azure subscription)
 
 Dockerization is done: [Dockerfile](../Dockerfile) builds a slim, non-root image with the DuckDB
 warehouse baked in at build time (consistent with the "batch, already-processed data" cut,
-[07-scope-cutlines.md](07-scope-cutlines.md)) — verified with a real `docker build` + `docker run`,
-`/health` and the authenticated `/sap/PortCallSet` both responding correctly.
+[07-scope-cutlines.md](07-scope-cutlines.md)).
 
 The Azure IaC is written as Terraform modules + Terragrunt environments (Gruntwork-style
 `modules/` + `live/` split, one `dev` environment structured so `staging`/`prod` are a copy-and-edit
-away, no module changes) — full detail in [infra/README.md](../infra/README.md). Every module
-validates standalone (`terraform validate`), and the Terragrunt wiring (remote state, provider
-generation, `dependency` blocks between resource group → log analytics/registry → environment →
-container app) resolves correctly up to the point of needing real Azure credentials, which this PoC
-was built without (`az` CLI not installed, no subscription connected in this environment) — that's
-the honest, verified boundary, not a config error.
+away, no module changes) — full detail in [infra/README.md](../infra/README.md). It was applied for
+real, end to end: resource group → storage/log analytics/registry → container app environment →
+container app, all created in a real Azure subscription (`swedencentral`).
 
-**Still open**: GitHub Actions (build + eval-gate + deploy) and an actual `terragrunt apply` against
-a real subscription, which needs the one-time state-backend bootstrap
-([infra/bootstrap](../infra/bootstrap)) and real credentials neither of which existed while building
-this PoC.
+**The API is live**: `https://ca-portintel-dev--96is9kz.nicemushroom-b8b4d37f.swedencentral.azurecontainerapps.io`
+— `/health`, the authenticated `/sap/PortCallSet`, and `/query` (the real agent, calling the real
+Claude API) all verified responding `200` from that URL, not from a local machine.
+
+### Real problems hit during the actual apply (and why they're worth keeping)
+
+None of these were config mistakes caught by `validate` — they only surface when you actually try to
+create resources in a real subscription, which is exactly why "plan looks clean" and "it deployed"
+are different claims:
+
+- **Region rejected the account**: `westeurope` returned `RequestDisallowedByAzure: ... not accepting
+  new customers` on the storage account. Fixed by moving both the bootstrap and `dev/env.hcl` to
+  `swedencentral` — also a better geographic fit for a Danish-data PoC.
+- **Resource provider not registered**: `Microsoft.App` (Container Apps) returned
+  `MissingSubscriptionRegistration` on a subscription that had never used it before. One-time fix:
+  `az provider register --namespace Microsoft.App`, then wait for `registrationState = Registered`.
+- **Image architecture mismatch**: the first image was built on Apple Silicon with a plain
+  `docker build`, producing an arm64-only manifest. Azure Container Apps rejected it at revision
+  provisioning time (`no child with platform linux/amd64 in index ...`). Fixed with
+  `docker buildx build --platform linux/amd64 ... --push`.
+- **Orphaned resource after a failed apply**: the container app with the bad image was actually
+  created in Azure before Terraform's polling step failed waiting for it to become healthy — so the
+  resource existed in Azure but not in Terraform state. `terraform import` couldn't recover it either
+  (Azure refuses to return secrets for a container app stuck in `ProvisioningState: Failed`). Resolved
+  by deleting the broken resource directly (`az containerapp delete`) and re-applying clean rather
+  than fighting an import against a resource in a dead state.
+
+**Still open**: GitHub Actions (build + eval-gate + deploy) — the manual sequence above (documented
+in [infra/README.md](../infra/README.md)) works and is verified, but isn't automated yet.
 
 ---
 

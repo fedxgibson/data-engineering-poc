@@ -116,21 +116,21 @@ environment → container app) via the `dependency` blocks in each component's
 `terragrunt.hcl` — no manual ordering needed beyond pushing the image before
 the container app first references it.
 
-## What's verified as of this PoC (no real Azure account used)
+## What's verified — applied to a real Azure subscription
 
-- **Every module validates standalone**: `terraform init -backend=false && terraform validate`
-  passes clean on all 5 modules and on `infra/bootstrap`.
-- **The Terragrunt wiring is correct up to the Azure authentication
-  boundary**: `terragrunt validate` on `live/dev/resource-group` resolves
-  `include`, `env.hcl`, and the generated `provider.tf`/`backend.tf`
-  correctly, and fails at exactly the point real cloud access would be
-  needed (`az` CLI / `ARM_*` credentials not present in this environment) —
-  not on a config error. That's the honest boundary of what can be verified
-  without a real subscription; see [domain/08-phases.md](../domain/08-phases.md)
-  for the plan to close it out with real credentials.
-- **The Docker image builds and runs correctly**: `docker build` succeeds,
-  the container starts, `/health` and the authenticated `/sap/PortCallSet`
-  endpoint both respond correctly against the embedded DuckDB warehouse.
+This has been deployed for real, not just planned. Live URL and the real problems hit along the way
+(region restrictions, an unregistered resource provider, an arm64/amd64 image mismatch, an orphaned
+resource after a failed apply) are in [domain/08-phases.md](../domain/08-phases.md#real-evidence-applied-to-a-real-azure-subscription) —
+worth reading before assuming `terraform validate` passing means a real subscription will cooperate.
+
+- Every module validates standalone (`terraform validate`) and applies cleanly end to end via
+  Terragrunt (`resource-group` → `log-analytics` + `container-registry` → `container-app-environment`
+  → `container-app`).
+- The Docker image builds, runs, and was pushed to the real ACR — but only after rebuilding
+  explicitly for `linux/amd64` (see the phases doc; a plain `docker build` on Apple Silicon produces
+  an arm64-only manifest that Azure Container Apps rejects).
+- `/health`, the authenticated `/sap/PortCallSet`, and `/query` (the real agent, calling the real
+  Claude API) all responded `200` from the live Azure URL.
 
 ## Known gaps
 

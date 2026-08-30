@@ -6,7 +6,11 @@ variable "resource_group_name" {
 
 variable "location" {
   type        = string
-  default     = "westeurope"
+  # westeurope rejected new storage accounts on this subscription
+  # ("not accepting new customers") -- swedencentral is the working Nordic
+  # region instead, and keeps the deploy geographically fitting for a
+  # Danish-data PoC.
+  default     = "swedencentral"
 }
 
 variable "storage_account_name" {
