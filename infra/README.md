@@ -132,13 +132,27 @@ that trust relationship, once, per subscription:
 APP_ID=$(az ad app create --display-name "gh-actions-portintel-poc" --query appId -o tsv)
 az ad sp create --id "$APP_ID"
 
-# 2. Federated credential: trust GitHub OIDC tokens, but only for this repo's main branch
+# 2. Federated credential: trust GitHub OIDC tokens, but only for this repo's main branch.
+#
+# GOTCHA (hit for real on the first deploy run): the `subject` value here has
+# to match EXACTLY what GitHub's OIDC token presents -- and that is not
+# always the plain `repo:<owner>/<repo>:ref:refs/heads/<branch>` every guide
+# shows. Some accounts/orgs get GitHub's immutable-ID subject format instead:
+# `repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:refs/heads/<branch>`. Guessing
+# wrong fails with `AADSTS700213: No matching federated identity record
+# found`, and the error conveniently echoes back the exact subject GitHub
+# actually sent -- copy that string verbatim rather than assuming the simple
+# form, or check it upfront by decoding a token from a debug run
+# (https://github.com/octo-org/octo-repo/actions -> a run's OIDC step summary).
 az ad app federated-credential create --id "$APP_ID" --parameters '{
   "name": "github-main-branch",
   "issuer": "https://token.actions.githubusercontent.com",
   "subject": "repo:<owner>/<repo>:ref:refs/heads/main",
   "audiences": ["api://AzureADTokenExchange"]
 }'
+# If step 1's federated credential doesn't match, fix it with:
+#   az ad app federated-credential update --id "$APP_ID" \
+#     --federated-credential-id github-main-branch --parameters '{...}'
 
 # 3. Least-privilege role assignments -- scoped to the two resource groups
 # this project actually touches, never the whole subscription.

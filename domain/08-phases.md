@@ -227,6 +227,21 @@ The `data/interim/*.parquet` fixture (14 days, ~38MB, already filtered to Aarhus
 committed on purpose so CI can rebuild the whole pipeline from scratch without needing the 590MB/day
 national raw files or live network access to the Danish Maritime Authority.
 
+**Both pipelines have run green for real**, not just been written: CI passed in 2m52s (dbt build,
+19 tests, the full 15-question eval set against `claude-opus-5`, Docker build). Deploy passed in
+4m41s, fully automated — `git push` → CI green → deploy auto-triggers → the same live URL from
+["Real evidence"](#real-evidence-applied-to-a-real-azure-subscription) above redeployed and
+re-verified with zero manual steps.
+
+One more real problem surfaced only by an actual OIDC token exchange (not `validate`, not `plan`):
+the federated credential's `subject` has to match **exactly** what GitHub's token presents, and this
+account's tokens use GitHub's immutable-ID subject format
+(`repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:refs/heads/main`) instead of the plain
+`repo:<owner>/<repo>:...` every OIDC tutorial shows. The fix was mechanical
+(`az ad app federated-credential update` with the exact string from the error message) but only
+discoverable by actually running it — see
+[infra/README.md](../infra/README.md#deploying-via-github-actions) for the corrected setup.
+
 ---
 
 ## Phase 6 — Wrap-up: README, security, and video
